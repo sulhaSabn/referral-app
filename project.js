@@ -1,73 +1,53 @@
- 
-const express = require('express'); const User = require('./User'); const router = express.Router();
+const express = require("express");
+const router = express.Router();
 
-const projectList = [ { id: 1, price: 100, percent: 1 }, { id: 2, price: 300, percent: 1.2 }, { id: 3, price: 500, percent: 1.5 }, { id: 4, price: 1000, percent: 1.8 }, { id: 5, price: 3000, percent: 2 } ];
+const User = require("./User");
 
-router.post('/buy', async (req, res) => { try { const { username, projectId } = req.body;
+const projects = {
+    1:100,
+    2:300,
+    3:500,
+    4:1000,
+    5:3000
+};
 
-const user = await User.findOne({ username });
-if (!user) {
-  return res.status(404).json({ message: 'User not found' });
-}
+router.post("/buy", async(req,res)=>{
+    try{
+        const {username,projectId} = req.body;
 
-if (!user.depositApproved) {
-  return res.status(400).json({
-    message: 'Deposit not approved yet. Minimum deposit is 100 USDT'
-  });
-}
+        const user = await User.findOne({username});
 
-const project = projectList.find(
-  (item) => item.id === Number(projectId)
-);
+        if(!user){
+            return res.status(404).json({
+                message:"User not found"
+            });
+        }
 
-if (!project) {
-  return res.status(400).json({ message: 'Project not found' });
-}
+        if(!user.depositApproved){
+            return res.status(400).json({
+                message:"Deposit required"
+            });
+        }
 
-if (user.balance < project.price) {
-  return res.status(400).json({ message: 'Insufficient balance' });
-}
+        const price = projects[projectId];
 
-user.balance -= project.price;
+        if(user.balance < price){
+            return res.status(400).json({
+                message:"Insufficient balance"
+            });
+        }
 
-user.projects.push({
-  id: project.id,
-  price: project.price,
-  percent: project.percent,
-  buyDate: new Date()
+        user.balance -= price;
+        await user.save();
+
+        res.json({
+            message:"Project purchased",
+            balance:user.balance
+        });
+
+    }catch(err){
+        res.status(500).json({message:err.message});
+    }
 });
-
-await user.save();
-
-res.json({
-  message: 'Project purchased successfully',
-  balance: user.balance
-});
-
-} catch (error) { res.status(500).json({ message: error.message }); } });
-
-router.post('/profit', async (req, res) => { try { const { username } = req.body;
-
-const user = await User.findOne({ username });
-if (!user) {
-  return res.status(404).json({ message: 'User not found' });
-}
-
-let totalProfit = 0;
-
-user.projects.forEach((project) => {
-  totalProfit += (project.price * project.percent) / 100;
-});
-
-user.balance += totalProfit;
-await user.save();
-
-res.json({
-  message: 'Daily profit added successfully',
-  profit: totalProfit,
-  balance: user.balance
-});
-
-} catch (error) { res.status(500).json({ message: error.message }); } });
 
 module.exports = router;
