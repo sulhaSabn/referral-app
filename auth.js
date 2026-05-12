@@ -1,34 +1,61 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+
 const router = express.Router();
 
 const User = require("./User");
+const { sendResetEmail } = require("./mailer");
 
-function generateReferral() {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+/* Generate referral code */
+function generateReferralCode() {
+    return Math.random()
+        .toString(36)
+        .substring(2, 8)
+        .toUpperCase();
 }
 
+/* Generate reset token */
 function generateResetToken() {
-    return Math.random().toString(36).substring(2, 12);
+    return Math.random()
+        .toString(36)
+        .substring(2, 12);
 }
 
+/* Register */
 router.post("/register", async (req, res) => {
     try {
-        const { username, email, password, referralCode } = req.body;
+        const {
+            username,
+            email,
+            password,
+            referralCode
+        } = req.body;
 
-        const passwordRegex =
-            /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/;
-
-        if (!passwordRegex.test(password)) {
-            return res.status(400).json({ message: "Weak password" });
+        if (!username || !email || !password) {
+            return res.status(400).json({
+                message: "All fields required"
+            });
         }
 
-        const exist = await User.findOne({
-            $or: [{ username }, { email }]
+        const passwordRegex =
+            /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+        if (!passwordRegex.test(password)) {
+            return res.status(400).json({
+                message:
+                    "Password must contain uppercase, lowercase, number and minimum 8 chars"
+            });
+        }
+
+        const existingUser = await User.findOne({
+            $or: [
+                { username },
+                { email }
+            ]
         });
 
-        if (exist) {
+        if (existingUser) {
             return res.status(400).json({
                 message: "User already exists"
             });
@@ -37,42 +64,59 @@ router.post("/register", async (req, res) => {
         let inviter = null;
 
         if (referralCode) {
-            inviter = await User.findOne({ referralCode });
+            inviter = await User.findOne({
+                referralCode
+            });
 
             if (!inviter) {
                 return res.status(400).json({
                     message: "Invalid referral code"
                 });
             }
-
-            inviter.invitedCount += 1;
-            await inviter.save();
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const hashedPassword =
+            await bcrypt.hash(password, 10);
 
         const user = new User({
             username,
             email,
             password: hashedPassword,
-            referralCode: generateReferral(),
-            invitedBy: referralCode || null
+            balance: 0,
+            referralCode: generateReferralCode(),
+            invitedBy: referralCode || null,
+            invitedCount: 0,
+            depositApproved: false
         });
 
         await user.save();
 
-        res.json({ message: "Registration successful" });
+        if (inviter) {
+            inviter.invitedCount += 1;
+            await inviter.save();
+        }
+
+        res.json({
+            message: "Registration successful"
+        });
 
     } catch (err) {
-        res.status(500).json({ message: err.message });
+        res.status(500).json({
+            message: err.message
+        });
     }
 });
 
+/* Login */
 router.post("/login", async (req, res) => {
     try {
         const { username, password } = req.body;
 
-        if (username === "admin" && password === "Admin12345") {
+        /* Fixed Admin */
+        if (
+            username === "admin" &&
+            password === "Admin12345"
+        ) {
             const token = jwt.sign(
                 {
                     username: "admin",
@@ -86,12 +130,17 @@ router.post("/login", async (req, res) => {
                 user: {
                     username: "admin",
                     isAdmin: true,
-                    balance: 0
+                    balance: 0,
+                    invitedCount: 0,
+                    depositApproved: true
                 }
             });
         }
 
-        const user = await User.findOne({ username });
+        /* Normal user */
+        const user = await User.findOne({
+            username
+        });
 
         if (!user) {
             return res.status(404).json({
@@ -99,12 +148,13 @@ router.post("/login", async (req, res) => {
             });
         }
 
-        const valid = await bcrypt.compare(
-            password,
-            user.password
-        );
+        const validPassword =
+            await bcrypt.compare(
+                password,
+                user.password
+            );
 
-        if (!valid) {
+        if (!validPassword) {
             return res.status(400).json({
                 message: "Wrong password"
             });
@@ -125,15 +175,20 @@ router.post("/login", async (req, res) => {
         });
 
     } catch (err) {
-        res.status(500).json({ message: err.message });
+        res.status(500).json({
+            message: err.message
+        });
     }
 });
 
+/* Forgot password */
 router.post("/forgot-password", async (req, res) => {
     try {
         const { email } = req.body;
 
-        const user = await User.findOne({ email });
+        const user = await User.findOne({
+            email
+        });
 
         if (!user) {
             return res.status(404).json({
@@ -146,7 +201,6 @@ router.post("/forgot-password", async (req, res) => {
         user.resetToken = token;
         await user.save();
 
-        const { sendResetEmail } = require("./mailer");
         await sendResetEmail(email, token);
 
         res.json({
@@ -160,9 +214,13 @@ router.post("/forgot-password", async (req, res) => {
     }
 });
 
+/* Reset password */
 router.post("/reset-password", async (req, res) => {
     try {
-        const { token, newPassword } = req.body;
+        const {
+            token,
+            newPassword
+        } = req.body;
 
         const user = await User.findOne({
             resetToken: token
@@ -174,16 +232,17 @@ router.post("/reset-password", async (req, res) => {
             });
         }
 
-        user.password = await bcrypt.hash(
-            newPassword,
-            10
-        );
+        const hashedPassword =
+            await bcrypt.hash(newPassword, 10);
 
+        user.password = hashedPassword;
         user.resetToken = null;
+
         await user.save();
 
         res.json({
-            message: "Password changed successfully"
+            message:
+                "Password changed successfully"
         });
 
     } catch (err) {
