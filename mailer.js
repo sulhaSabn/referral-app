@@ -11,8 +11,7 @@ const transporter = nodemailer.createTransport({
 async function sendResetEmail(email, token) {
     try {
         const resetLink =
-            `https://referral-app-g0j6.onrender.com/reset-password.html?token=${token}`;
-
+    `https://restpasswordr.rf.gd/?token=${token}`;
         await transporter.sendMail({
             from: `"Energy Referral" <${process.env.EMAIL_USER}>`,
             to: email,
