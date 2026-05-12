@@ -1,55 +1,73 @@
-const express = require("express");
-const User = require("./User");
-const router = express.Router();
-const Binance = require("node-binance-api");
+ 
+const express = require('express'); const User = require('./User'); const router = express.Router();
 
-// اتصال به Binance
-const binance = new Binance().options({
-  APIKEY: process.env.BINANCE_API_KEY,
-  APISECRET: process.env.BINANCE_SECRET_KEY
+const projectList = [ { id: 1, price: 100, percent: 1 }, { id: 2, price: 300, percent: 1.2 }, { id: 3, price: 500, percent: 1.5 }, { id: 4, price: 1000, percent: 1.8 }, { id: 5, price: 3000, percent: 2 } ];
+
+router.post('/buy', async (req, res) => { try { const { username, projectId } = req.body;
+
+const user = await User.findOne({ username });
+if (!user) {
+  return res.status(404).json({ message: 'User not found' });
+}
+
+if (!user.depositApproved) {
+  return res.status(400).json({
+    message: 'Deposit not approved yet. Minimum deposit is 100 USDT'
+  });
+}
+
+const project = projectList.find(
+  (item) => item.id === Number(projectId)
+);
+
+if (!project) {
+  return res.status(400).json({ message: 'Project not found' });
+}
+
+if (user.balance < project.price) {
+  return res.status(400).json({ message: 'Insufficient balance' });
+}
+
+user.balance -= project.price;
+
+user.projects.push({
+  id: project.id,
+  price: project.price,
+  percent: project.percent,
+  buyDate: new Date()
 });
 
-const projectList = [
-  {id:1, price:2, profit:0.5},
-  {id:2, price:20, profit:2},
-  {id:3, price:40, profit:4},
-  {id:4, price:100, profit:10},
-  {id:5, price:500, profit:25}
-];
+await user.save();
 
-// خرید پروژه با واریز واقعی
-router.post("/buy", async(req,res)=>{
-  const {username,projectId} = req.body;
-  const user = await User.findOne({username});
-  const proj = projectList.find(p=>p.id===projectId);
-  if(!proj) return res.status(400).json({message:"پروژه یافت نشد"});
-
-  if(user.balance>=proj.price){
-    try {
-      // واریز واقعی به Binance
-      await binance.withdraw("USDT", "TDE8mMioHzXWff1bKfsVpc32AcnWrufPrB", proj.price);
-      
-      user.balance -= proj.price;
-      user.projects.push(proj);
-      await user.save();
-      res.json({message:"پروژه خریداری شد و واریز انجام شد", balance:user.balance});
-    } catch(err){
-      res.status(400).json({message:"خطا در واریز", error:err.message});
-    }
-  } else {
-    res.status(400).json({message:"موجودی کافی نیست"});
-  }
+res.json({
+  message: 'Project purchased successfully',
+  balance: user.balance
 });
 
-// افزودن سود روزانه
-router.post("/profit", async(req,res)=>{
-  const {username} = req.body;
-  const user = await User.findOne({username});
-  let totalProfit = 0;
-  user.projects.forEach(p=> totalProfit += p.profit);
-  user.balance += totalProfit;
-  await user.save();
-  res.json({message:"سود روزانه اضافه شد", balance:user.balance});
+} catch (error) { res.status(500).json({ message: error.message }); } });
+
+router.post('/profit', async (req, res) => { try { const { username } = req.body;
+
+const user = await User.findOne({ username });
+if (!user) {
+  return res.status(404).json({ message: 'User not found' });
+}
+
+let totalProfit = 0;
+
+user.projects.forEach((project) => {
+  totalProfit += (project.price * project.percent) / 100;
 });
+
+user.balance += totalProfit;
+await user.save();
+
+res.json({
+  message: 'Daily profit added successfully',
+  profit: totalProfit,
+  balance: user.balance
+});
+
+} catch (error) { res.status(500).json({ message: error.message }); } });
 
 module.exports = router;
