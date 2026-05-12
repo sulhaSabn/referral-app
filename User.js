@@ -1,20 +1,67 @@
 const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema({
-    username:{type:String,unique:true},
-    email:{type:String,unique:true},
-    password:String,
+    username: {
+        type: String,
+        required: true,
+        unique: true
+    },
 
-    balance:{type:Number,default:0},
-    depositApproved:{type:Boolean,default:false},
+    email: {
+        type: String,
+        required: true,
+        unique: true
+    },
 
-    referralCode:{type:String,unique:true},
-    invitedBy:{type:String,default:null},
-    invitedCount:{type:Number,default:0},
+    password: {
+        type: String,
+        required: true
+    },
 
-    isAdmin:{type:Boolean,default:false},
+    balance: {
+        type: Number,
+        default: 0
+    },
 
-    resetToken:{type:String,default:null}
+    referralCode: {
+        type: String,
+        unique: true
+    },
+
+    invitedBy: {
+        type: String,
+        default: null
+    },
+
+    invitedCount: {
+        type: Number,
+        default: 0
+    },
+
+    depositApproved: {
+        type: Boolean,
+        default: false
+    },
+
+    projects: {
+        type: Array,
+        default: []
+    },
+
+    resetToken: {
+        type: String,
+        default: null
+    },
+
+    isAdmin: {
+        type: Boolean,
+        default: false
+    },
+
+    createdAt: {
+        type: Date,
+        default: Date.now
+    }
 });
 
 module.exports = mongoose.model("User", userSchema);
