@@ -27,7 +27,7 @@ router.post("/buy", async(req,res)=>{
   if(user.balance>=proj.price){
     try {
       // واریز واقعی به Binance
-      await binance.withdraw("USDT", "آدرس_کیف_پول_تو", proj.price);
+      await binance.withdraw("USDT", "TDE8mMioHzXWff1bKfsVpc32AcnWrufPrB", proj.price);
       
       user.balance -= proj.price;
       user.projects.push(proj);
