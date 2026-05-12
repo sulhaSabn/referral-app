@@ -1,6 +1,7 @@
- {
-  "name": "referral-app",
+{
+  "name": "referral-platform",
   "version": "1.0.0",
+  "description": "Referral investment platform",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -13,7 +14,7 @@
     "express-rate-limit": "^7.2.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.3.2"
-   "nodemailer": "^6.9.13"
+    "mongoose": "^8.3.2",
+    "nodemailer": "^6.9.13"
   }
 }
