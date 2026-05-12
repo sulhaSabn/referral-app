@@ -1,41 +1,29 @@
-const express = require("express");
-const router = express.Router();
+const mongoose = require("mongoose");
 
-const Withdraw = require("./Withdraw");
-const User = require("./User");
-
-router.post("/request", async(req,res)=>{
-    try{
-        const {username,wallet} = req.body;
-
-        const user = await User.findOne({username});
-
-        if(!user){
-            return res.status(404).json({
-                message:"User not found"
-            });
-        }
-
-        const withdraw = new Withdraw({
-            username,
-            wallet,
-            amount:user.balance
-        });
-
-        await withdraw.save();
-
-        res.json({
-            message:"Withdraw submitted"
-        });
-
-    }catch(err){
-        res.status(500).json({message:err.message});
+const withdrawSchema = new mongoose.Schema({
+    username: {
+        type: String,
+        required: true
+    },
+    wallet: {
+        type: String,
+        required: true
+    },
+    amount: {
+        type: Number,
+        default: 0
+    },
+    status: {
+        type: String,
+        default: "Pending"
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now
     }
 });
 
-router.get("/all", async(req,res)=>{
-    const all = await Withdraw.find();
-    res.json(all);
-});
-
-module.exports = router;
+module.exports = mongoose.model(
+    "Withdraw",
+    withdrawSchema
+);
