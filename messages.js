@@ -26,7 +26,9 @@ router.get("/all",(req,res)=>{
 router.post("/reply",(req,res)=>{
     const {id,reply} = req.body;
 
-    const msg = messages.find(m=>m._id === id);
+    const msg = messages.find(
+        item => item._id === id
+    );
 
     if(!msg){
         return res.status(404).json({
@@ -37,7 +39,7 @@ router.post("/reply",(req,res)=>{
     msg.reply = reply;
 
     res.json({
-        message:"Reply sent successfully"
+        message:"Reply saved successfully"
     });
 });
 
