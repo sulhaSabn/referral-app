@@ -1,5 +1,5 @@
 require("dotenv").config();
-
+const messageRoutes = require("./messages");
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -47,7 +47,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/withdraw", withdrawRoutes);
 app.use("/api/admin", adminRoutes);
-
+app.use("/api/messages", messageRoutes);
 /* Frontend Routes */
 app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "index.html"));
