@@ -10,47 +10,41 @@ const projects = {
     5: { id:5, name:"Premium Plan", price:3000, roi:2 }
 };
 
-/* سود لحظه‌ای */
+/* محاسبه سود لحظه‌ای و تایمر */
 function calculateProfit(user) {
     let totalProfit = 0;
     let updatedProjects = [];
 
     if (!user.projects || user.projects.length === 0) {
-        return {
-            totalProfit:0,
-            projects:[]
-        };
+        return { totalProfit:0, projects:[] };
     }
 
     user.projects.forEach(project => {
         const buyDate = new Date(project.purchaseDate);
         const now = new Date();
-
         const diffMs = now - buyDate;
-
         const secondsPassed = diffMs / 1000;
 
-        const dailyProfit =
-            (project.price * project.roi) / 100;
-
-        const profitPerSecond =
-            dailyProfit / 86400;
-
-        const liveProfit =
-            profitPerSecond * secondsPassed;
+        const dailyProfit = (project.price * project.roi) / 100;
+        const profitPerSecond = dailyProfit / 86400;
+        const liveProfit = profitPerSecond * secondsPassed;
 
         totalProfit += liveProfit;
 
         updatedProjects.push({
-            ...project._doc,
+            projectId: project.projectId,
+            name: project.name,
+            price: project.price,
+            roi: project.roi,
+            purchaseDate: project.purchaseDate,
             liveProfit: Number(liveProfit.toFixed(6)),
             runningSeconds: Math.floor(secondsPassed)
         });
     });
 
     return {
-        totalProfit:Number(totalProfit.toFixed(6)),
-        projects:updatedProjects
+        totalProfit: Number(totalProfit.toFixed(6)),
+        projects: updatedProjects
     };
 }
 
@@ -58,53 +52,40 @@ function calculateProfit(user) {
 router.post("/buy", async (req, res) => {
     try {
         const { username, projectId } = req.body;
-
         const user = await User.findOne({ username });
 
         if (!user) {
-            return res.status(404).json({
-                message:"User not found"
-            });
+            return res.status(404).json({ message:"User not found" });
         }
 
         const project = projects[projectId];
-
         if (!project) {
-            return res.status(400).json({
-                message:"Invalid project"
-            });
+            return res.status(400).json({ message:"Invalid project" });
         }
 
         if (!user.depositApproved) {
-            return res.status(400).json({
-                message:"Deposit not approved"
-            });
+            return res.status(400).json({ message:"Deposit not approved" });
         }
 
         if (user.balance < project.price) {
-            return res.status(400).json({
-                message:"Insufficient balance"
-            });
+            return res.status(400).json({ message:"Insufficient balance" });
         }
 
         const alreadyBought = user.projects.some(
             item => item.projectId === project.id
         );
-
         if (alreadyBought) {
-            return res.status(400).json({
-                message:"Already purchased"
-            });
+            return res.status(400).json({ message:"Already purchased" });
         }
 
+        // کم کردن موجودی و ذخیره پروژه
         user.balance -= project.price;
-
         user.projects.push({
-            projectId:project.id,
-            name:project.name,
-            price:project.price,
-            roi:project.roi,
-            purchaseDate:new Date()
+            projectId: project.id,
+            name: project.name,
+            price: project.price,
+            roi: project.roi,
+            purchaseDate: new Date()
         });
 
         await user.save();
@@ -116,29 +97,21 @@ router.post("/buy", async (req, res) => {
         });
 
     } catch (err) {
-        res.status(500).json({
-            message:err.message
-        });
+        res.status(500).json({ message:err.message });
     }
 });
 
 /* داشبورد */
 router.get("/dashboard/:username", async (req, res) => {
     try {
-        const user = await User.findOne({
-            username:req.params.username
-        });
+        const user = await User.findOne({ username:req.params.username });
 
         if (!user) {
-            return res.status(404).json({
-                message:"User not found"
-            });
+            return res.status(404).json({ message:"User not found" });
         }
 
         const result = calculateProfit(user);
-
-        const totalBalance =
-            user.balance + result.totalProfit;
+        const totalBalance = user.balance + result.totalProfit;
 
         res.json({
             user,
@@ -149,9 +122,7 @@ router.get("/dashboard/:username", async (req, res) => {
         });
 
     } catch (err) {
-        res.status(500).json({
-            message:err.message
-        });
+        res.status(500).json({ message:err.message });
     }
 });
 
