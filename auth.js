@@ -1,6 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const axios = require("axios");
 
 const router = express.Router();
 
@@ -22,15 +23,28 @@ function generateResetToken() {
         .substring(2, 12);
 }
 
+/* Create wallet */
+async function createWallet() {
+    const response = await axios.post(
+        "https://chaingateway.io/api/v2/newAddress",
+        {
+            currency: "USDT",
+            network: "TRC20"
+        },
+        {
+            headers: {
+                "x-api-key": process.env.CHAIN_API_KEY
+            }
+        }
+    );
+
+    return response.data.address;
+}
+
 /* Register */
 router.post("/register", async (req, res) => {
     try {
-        const {
-            username,
-            email,
-            password,
-            referralCode
-        } = req.body;
+        const { username, email, password, referralCode } = req.body;
 
         if (!username || !email || !password) {
             return res.status(400).json({
@@ -49,10 +63,7 @@ router.post("/register", async (req, res) => {
         }
 
         const existingUser = await User.findOne({
-            $or: [
-                { username },
-                { email }
-            ]
+            $or: [{ username }, { email }]
         });
 
         if (existingUser) {
@@ -64,9 +75,7 @@ router.post("/register", async (req, res) => {
         let inviter = null;
 
         if (referralCode) {
-            inviter = await User.findOne({
-                referralCode
-            });
+            inviter = await User.findOne({ referralCode });
 
             if (!inviter) {
                 return res.status(400).json({
@@ -75,14 +84,17 @@ router.post("/register", async (req, res) => {
             }
         }
 
-        const hashedPassword =
-            await bcrypt.hash(password, 10);
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        /* Auto wallet creation */
+        const walletAddress = await createWallet();
 
         const user = new User({
             username,
             email,
             password: hashedPassword,
             balance: 0,
+            walletAddress,
             referralCode: generateReferralCode(),
             invitedBy: referralCode || null,
             invitedCount: 0,
@@ -97,7 +109,8 @@ router.post("/register", async (req, res) => {
         }
 
         res.json({
-            message: "Registration successful"
+            message: "Registration successful",
+            walletAddress
         });
 
     } catch (err) {
@@ -112,14 +125,14 @@ router.post("/login", async (req, res) => {
     try {
         const { username, password } = req.body;
 
-        /* Fixed Admin */
+        /* Admin from env */
         if (
-            username === "admin" &&
-            password === "Admin12345"
+            username === process.env.ADMIN_USER &&
+            password === process.env.ADMIN_PASS
         ) {
             const token = jwt.sign(
                 {
-                    username: "admin",
+                    username: process.env.ADMIN_USER,
                     isAdmin: true
                 },
                 process.env.JWT_SECRET
@@ -128,7 +141,7 @@ router.post("/login", async (req, res) => {
             return res.json({
                 token,
                 user: {
-                    username: "admin",
+                    username: process.env.ADMIN_USER,
                     isAdmin: true,
                     balance: 0,
                     invitedCount: 0,
@@ -137,10 +150,7 @@ router.post("/login", async (req, res) => {
             });
         }
 
-        /* Normal user */
-        const user = await User.findOne({
-            username
-        });
+        const user = await User.findOne({ username });
 
         if (!user) {
             return res.status(404).json({
@@ -148,11 +158,10 @@ router.post("/login", async (req, res) => {
             });
         }
 
-        const validPassword =
-            await bcrypt.compare(
-                password,
-                user.password
-            );
+        const validPassword = await bcrypt.compare(
+            password,
+            user.password
+        );
 
         if (!validPassword) {
             return res.status(400).json({
@@ -186,9 +195,7 @@ router.post("/forgot-password", async (req, res) => {
     try {
         const { email } = req.body;
 
-        const user = await User.findOne({
-            email
-        });
+        const user = await User.findOne({ email });
 
         if (!user) {
             return res.status(404).json({
@@ -217,10 +224,7 @@ router.post("/forgot-password", async (req, res) => {
 /* Reset password */
 router.post("/reset-password", async (req, res) => {
     try {
-        const {
-            token,
-            newPassword
-        } = req.body;
+        const { token, newPassword } = req.body;
 
         const user = await User.findOne({
             resetToken: token
@@ -232,8 +236,7 @@ router.post("/reset-password", async (req, res) => {
             });
         }
 
-        const hashedPassword =
-            await bcrypt.hash(newPassword, 10);
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
 
         user.password = hashedPassword;
         user.resetToken = null;
@@ -241,8 +244,7 @@ router.post("/reset-password", async (req, res) => {
         await user.save();
 
         res.json({
-            message:
-                "Password changed successfully"
+            message: "Password changed successfully"
         });
 
     } catch (err) {
