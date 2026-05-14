@@ -23,6 +23,13 @@ const userSchema = new mongoose.Schema({
         default: 0
     },
 
+    walletAddress: {
+        type: String,
+        default: "",
+        unique: true,
+        sparse: true
+    },
+
     referralCode: {
         type: String,
         unique: true
