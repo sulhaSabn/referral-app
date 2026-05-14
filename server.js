@@ -13,7 +13,9 @@ const withdrawRoutes = require("./withdraw");
 const adminRoutes = require("./admin");
 
 const app = express();
-
+const axios = require("axios");
+const User = require("./models/User");
+const Transaction = require("./models/Transaction");
 /* Security */
 app.use(helmet());
 
@@ -56,8 +58,76 @@ app.get("/", (req, res) => {
 app.get("/reset-password.html", (req, res) => {
     res.sendFile(path.join(__dirname, "reset-password.html"));
 });
+app.post("/api/create-wallet/:userId", async (req, res) => {
+    try {
+        const response = await axios.post(
+            "https://chaingateway.io/api/v2/newAddress",
+            {
+                currency: "USDT",
+                network: "TRC20"
+            },
+            {
+                headers: {
+                    "x-api-key": process.env.CHAIN_API_KEY
+                }
+            }
+        );
 
-/* 404 Handler */
+        const walletAddress = response.data.address;
+
+        await User.findByIdAndUpdate(
+            req.params.userId,
+            { walletAddress }
+        );
+
+        res.json({
+            walletAddress
+        });
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({
+            message: "Wallet creation failed"
+        });
+    }
+});
+app.post("/webhook/deposit", async (req, res) => {
+    try {
+        const { address, amount, txid } = req.body;
+
+        const existingTx = await Transaction.findOne({ txid });
+
+        if (existingTx) {
+            return res.sendStatus(200);
+        }
+
+        const user = await User.findOne({
+            walletAddress: address
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        await Transaction.create({
+            txid,
+            address,
+            amount
+        });
+
+        user.balance += Number(amount);
+        await user.save();
+
+        res.sendStatus(200);
+
+    } catch (error) {
+        console.log(error);
+        res.sendStatus(500);
+    }
+});
+/*404 Handler */
 app.use((req, res) => {
     res.status(404).json({
         message: "Route not found"
