@@ -1,5 +1,5 @@
 {
-  "name": "referral-platform",
+  "name": "referral-app",
   "version": "1.0.0",
   "description": "Referral investment platform",
   "main": "server.js",
