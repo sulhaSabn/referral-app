@@ -1,4 +1,4 @@
-const TronWeb = require("tronweb");
+const { TronWeb } = require("tronweb");
 const cron = require("node-cron");
 
 const User = require("./User");
