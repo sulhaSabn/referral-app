@@ -6,7 +6,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const path = require("path");
-
+require("./tronMonitor");
 const authRoutes = require("./auth");
 const projectRoutes = require("./project");
 const withdrawRoutes = require("./withdraw");
