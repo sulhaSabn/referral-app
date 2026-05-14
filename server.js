@@ -14,8 +14,8 @@ const adminRoutes = require("./admin");
 
 const app = express();
 const axios = require("axios");
-const User = require("./models/User");
-const Transaction = require("./models/Transaction");
+const User = require("./User");
+const Transaction = require("./Transaction");
 /* Security */
 app.use(helmet());
 
