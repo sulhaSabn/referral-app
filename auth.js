@@ -23,16 +23,21 @@ function generateResetToken() {
         .substring(2, 12);
 }
 
-/* Create wallet */
-
+/* Create TRON wallet */
 async function createWallet() {
-    const account = await TronWeb.createAccount();
+    try {
+        const account =
+            await TronWeb.utils.accounts.generateAccount();
 
-    return {
-        address: account.address.base58,
-        privateKey: account.privateKey
-    };
+        return {
+            address: account.address.base58,
+            privateKey: account.privateKey
+        };
+    } catch (error) {
+        throw new Error("Wallet generation failed");
+    }
 }
+
 /* Register */
 router.post("/register", async (req, res) => {
     try {
@@ -78,19 +83,20 @@ router.post("/register", async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        /* Auto wallet creation */
+        /* Create unique wallet */
         const wallet = await createWallet();
+
         const user = new User({
-    username,
-    email,
-    password: hashedPassword,
-    balance: 0,
-    walletAddress: wallet.address,
-    referralCode: generateReferralCode(),
-    invitedBy: referralCode || null,
-    invitedCount: 0,
-    depositApproved: false
-});
+            username,
+            email,
+            password: hashedPassword,
+            balance: 0,
+            walletAddress: wallet.address,
+            referralCode: generateReferralCode(),
+            invitedBy: referralCode || null,
+            invitedCount: 0,
+            depositApproved: false
+        });
 
         await user.save();
 
@@ -100,9 +106,9 @@ router.post("/register", async (req, res) => {
         }
 
         res.json({
-    message: "Registration successful",
-    walletAddress: wallet.address
-});
+            message: "Registration successful",
+            walletAddress: wallet.address
+        });
 
     } catch (err) {
         res.status(500).json({
@@ -116,7 +122,7 @@ router.post("/login", async (req, res) => {
     try {
         const { username, password } = req.body;
 
-        /* Admin from env */
+        /* Admin login */
         if (
             username === process.env.ADMIN_USER &&
             password === process.env.ADMIN_PASS
@@ -227,9 +233,7 @@ router.post("/reset-password", async (req, res) => {
             });
         }
 
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-        user.password = hashedPassword;
+        user.password = await bcrypt.hash(newPassword, 10);
         user.resetToken = null;
 
         await user.save();
