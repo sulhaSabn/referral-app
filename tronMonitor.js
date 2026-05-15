@@ -1,15 +1,10 @@
-const TronWeb = require("tronweb");
 const cron = require("node-cron");
 const axios = require("axios");
 
 const User = require("./User");
 const Transaction = require("./Transaction");
 
-const tronWeb = new TronWeb({
-    fullHost: "https://api.trongrid.io"
-});
-
-/* check every 30 sec */
+/* Check deposits every 30 seconds */
 cron.schedule("*/30 * * * * *", async () => {
     try {
         console.log("Checking deposits...");
@@ -19,35 +14,67 @@ cron.schedule("*/30 * * * * *", async () => {
         });
 
         for (const user of users) {
+            try {
+                const response = await axios.get(
+                    `https://api.trongrid.io/v1/accounts/${user.walletAddress}/transactions/trc20`,
+                    {
+                        headers: process.env.TRONGRID_API_KEY
+                            ? {
+                                  "TRON-PRO-API-KEY":
+                                      process.env.TRONGRID_API_KEY
+                              }
+                            : {}
+                    }
+                );
 
-            const response = await axios.get(
-                `https://api.trongrid.io/v1/accounts/${user.walletAddress}/transactions/trc20`
-            );
+                const txs = response.data.data || [];
 
-            const txs = response.data.data || [];
+                for (const tx of txs) {
+                    /* only incoming USDT */
+                    if (
+                        !tx.token_info ||
+                        tx.token_info.symbol !== "USDT" ||
+                        tx.to !== user.walletAddress
+                    ) {
+                        continue;
+                    }
 
-            for (const tx of txs) {
-                const txid = tx.transaction_id;
+                    const txid = tx.transaction_id;
 
-                const exists = await Transaction.findOne({ txid });
-                if (exists) continue;
+                    /* prevent duplicate deposits */
+                    const exists = await Transaction.findOne({
+                        txid
+                    });
 
-                await Transaction.create({
-                    txid,
-                    address: user.walletAddress,
-                    amount: Number(tx.value) / 1000000
-                });
+                    if (exists) continue;
 
-                user.depositApproved = true;
-                user.balance += Number(tx.value) / 1000000;
+                    const amount = Number(tx.value) / 1000000;
 
-                await user.save();
+                    await Transaction.create({
+                        txid,
+                        address: user.walletAddress,
+                        amount
+                    });
 
-                console.log(`Deposit detected for ${user.username}`);
+                    user.depositApproved = true;
+                    user.balance += amount;
+
+                    await user.save();
+
+                    console.log(
+                        `Deposit detected for ${user.username}: ${amount} USDT`
+                    );
+                }
+            } catch (walletError) {
+                console.log(
+                    `Wallet check error (${user.username}):`,
+                    walletError.message
+                );
             }
         }
-
     } catch (error) {
         console.log("Deposit monitor error:", error.message);
     }
 });
+
+module.exports = {};
