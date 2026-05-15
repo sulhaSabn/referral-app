@@ -1,7 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const TronWeb = require("tronweb");
+const { generateAccount } = require("tronweb/accounts");
 
 const router = express.Router();
 
@@ -26,14 +26,14 @@ function generateResetToken() {
 /* Create TRON wallet */
 async function createWallet() {
     try {
-        const account =
-            await TronWeb.utils.accounts.generateAccount();
+        const account = await generateAccount();
 
         return {
             address: account.address.base58,
             privateKey: account.privateKey
         };
     } catch (error) {
+        console.log("Wallet error:", error.message);
         throw new Error("Wallet generation failed");
     }
 }
@@ -86,18 +86,18 @@ router.post("/register", async (req, res) => {
         /* Create unique wallet */
         const wallet = await createWallet();
 
-const user = new User({
-    username,
-    email,
-    password: hashedPassword,
-    balance: 0,
-    walletAddress: wallet.address,
-    privateKey: wallet.privateKey,
-    referralCode: generateReferralCode(),
-    invitedBy: referralCode || null,
-    invitedCount: 0,
-    depositApproved: false
-});
+        const user = new User({
+            username,
+            email,
+            password: hashedPassword,
+            balance: 0,
+            walletAddress: wallet.address,
+            privateKey: wallet.privateKey,
+            referralCode: generateReferralCode(),
+            invitedBy: referralCode || null,
+            invitedCount: 0,
+            depositApproved: false
+        });
 
         await user.save();
 
@@ -112,6 +112,7 @@ const user = new User({
         });
 
     } catch (err) {
+        console.log(err);
         res.status(500).json({
             message: err.message
         });
@@ -171,7 +172,7 @@ router.post("/login", async (req, res) => {
             {
                 id: user._id,
                 username: user.username,
-                isAdmin: false
+                isAdmin: user.isAdmin || false
             },
             process.env.JWT_SECRET
         );
