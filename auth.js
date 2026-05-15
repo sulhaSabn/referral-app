@@ -1,29 +1,34 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const TronWeb = require("tronweb");
+const { TronWeb } = require("tronweb");
 
 const router = express.Router();
 
 const User = require("./User");
 const { sendResetEmail } = require("./mailer");
 
-/* Generate referral code */
-function generateReferralCode() {
-    return Math.random()
-        .toString(36)
-        .substring(2, 8)
-        .toUpperCase();
-}
 
-/* Generate reset token */
 function generateResetToken() {
-    return Math.random()
-        .toString(36)
-        .substring(2, 12);
+    return Math.random().toString(36).substring(2, 12);
 }
 
-/* Create TRON wallet */
+async function generateReferralCode() {
+    let code;
+    let exists = true;
+
+    while (exists) {
+        code = Math.random()
+            .toString(36)
+            .substring(2, 8)
+            .toUpperCase();
+
+        exists = await User.findOne({ referralCode: code });
+    }
+
+    return code;
+}
+
 async function createWallet() {
     try {
         const account = await TronWeb.createAccount();
@@ -33,10 +38,10 @@ async function createWallet() {
             privateKey: account.privateKey
         };
     } catch (error) {
-        console.log("Wallet error:", error.message);
         throw new Error("Wallet generation failed");
     }
 }
+
 
 /* REGISTER */
 router.post("/register", async (req, res) => {
@@ -45,7 +50,7 @@ router.post("/register", async (req, res) => {
 
         if (!username || !email || !password) {
             return res.status(400).json({
-                message: "All fields are required"
+                message: "All fields required"
             });
         }
 
@@ -72,7 +77,6 @@ router.post("/register", async (req, res) => {
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-
         const wallet = await createWallet();
 
         const user = new User({
@@ -82,11 +86,8 @@ router.post("/register", async (req, res) => {
             balance: 0,
             walletAddress: wallet.address,
             privateKey: wallet.privateKey,
-            referralCode: generateReferralCode(),
-            invitedBy: referralCode || null,
-            invitedCount: 0,
-            depositApproved: false,
-            isAdmin: false
+            referralCode: await generateReferralCode(),
+            invitedBy: referralCode || null
         });
 
         await user.save();
@@ -102,19 +103,19 @@ router.post("/register", async (req, res) => {
         });
 
     } catch (err) {
-        console.log("Register error:", err);
+        console.log(err);
         res.status(500).json({
             message: err.message
         });
     }
 });
 
+
 /* LOGIN */
 router.post("/login", async (req, res) => {
     try {
         const { username, password } = req.body;
 
-        /* Admin login */
         if (
             username === process.env.ADMIN_USER &&
             password === process.env.ADMIN_PASS
@@ -124,15 +125,15 @@ router.post("/login", async (req, res) => {
                     username,
                     isAdmin: true
                 },
-                process.env.JWT_SECRET
+                process.env.JWT_SECRET,
+                { expiresIn: "7d" }
             );
 
             return res.json({
                 token,
                 user: {
                     username,
-                    isAdmin: true,
-                    balance: 0
+                    isAdmin: true
                 }
             });
         }
@@ -160,23 +161,35 @@ router.post("/login", async (req, res) => {
             {
                 id: user._id,
                 username: user.username,
-                isAdmin: user.isAdmin || false
+                isAdmin: user.isAdmin
             },
-            process.env.JWT_SECRET
+            process.env.JWT_SECRET,
+            { expiresIn: "7d" }
         );
 
         res.json({
             token,
-            user
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email,
+                balance: user.balance,
+                walletAddress: user.walletAddress,
+                referralCode: user.referralCode,
+                invitedCount: user.invitedCount,
+                depositApproved: user.depositApproved,
+                isAdmin: user.isAdmin
+            }
         });
 
     } catch (err) {
-        console.log("Login error:", err);
+        console.log(err);
         res.status(500).json({
             message: err.message
         });
     }
 });
+
 
 /* FORGOT PASSWORD */
 router.post("/forgot-password", async (req, res) => {
@@ -194,6 +207,8 @@ router.post("/forgot-password", async (req, res) => {
         const token = generateResetToken();
 
         user.resetToken = token;
+        user.resetTokenExpiry = Date.now() + 3600000;
+
         await user.save();
 
         await sendResetEmail(email, token);
@@ -203,12 +218,13 @@ router.post("/forgot-password", async (req, res) => {
         });
 
     } catch (err) {
-        console.log("Forgot password error:", err);
+        console.log(err);
         res.status(500).json({
             message: err.message
         });
     }
 });
+
 
 /* RESET PASSWORD */
 router.post("/reset-password", async (req, res) => {
@@ -216,17 +232,19 @@ router.post("/reset-password", async (req, res) => {
         const { token, newPassword } = req.body;
 
         const user = await User.findOne({
-            resetToken: token
+            resetToken: token,
+            resetTokenExpiry: { $gt: Date.now() }
         });
 
         if (!user) {
             return res.status(400).json({
-                message: "Invalid token"
+                message: "Invalid or expired token"
             });
         }
 
         user.password = await bcrypt.hash(newPassword, 10);
         user.resetToken = null;
+        user.resetTokenExpiry = null;
 
         await user.save();
 
@@ -235,7 +253,7 @@ router.post("/reset-password", async (req, res) => {
         });
 
     } catch (err) {
-        console.log("Reset password error:", err);
+        console.log(err);
         res.status(500).json({
             message: err.message
         });
