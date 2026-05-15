@@ -1,7 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { generateAccount } = require("tronweb/accounts");
+const TronWeb = require("tronweb");
 
 const router = express.Router();
 
@@ -26,7 +26,7 @@ function generateResetToken() {
 /* Create TRON wallet */
 async function createWallet() {
     try {
-        const account = await generateAccount();
+        const account = await TronWeb.createAccount();
 
         return {
             address: account.address.base58,
@@ -38,24 +38,14 @@ async function createWallet() {
     }
 }
 
-/* Register */
+/* REGISTER */
 router.post("/register", async (req, res) => {
     try {
         const { username, email, password, referralCode } = req.body;
 
         if (!username || !email || !password) {
             return res.status(400).json({
-                message: "All fields required"
-            });
-        }
-
-        const passwordRegex =
-            /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-
-        if (!passwordRegex.test(password)) {
-            return res.status(400).json({
-                message:
-                    "Password must contain uppercase, lowercase, number and minimum 8 chars"
+                message: "All fields are required"
             });
         }
 
@@ -83,7 +73,6 @@ router.post("/register", async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        /* Create unique wallet */
         const wallet = await createWallet();
 
         const user = new User({
@@ -96,7 +85,8 @@ router.post("/register", async (req, res) => {
             referralCode: generateReferralCode(),
             invitedBy: referralCode || null,
             invitedCount: 0,
-            depositApproved: false
+            depositApproved: false,
+            isAdmin: false
         });
 
         await user.save();
@@ -112,14 +102,14 @@ router.post("/register", async (req, res) => {
         });
 
     } catch (err) {
-        console.log(err);
+        console.log("Register error:", err);
         res.status(500).json({
             message: err.message
         });
     }
 });
 
-/* Login */
+/* LOGIN */
 router.post("/login", async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -131,7 +121,7 @@ router.post("/login", async (req, res) => {
         ) {
             const token = jwt.sign(
                 {
-                    username: process.env.ADMIN_USER,
+                    username,
                     isAdmin: true
                 },
                 process.env.JWT_SECRET
@@ -140,11 +130,9 @@ router.post("/login", async (req, res) => {
             return res.json({
                 token,
                 user: {
-                    username: process.env.ADMIN_USER,
+                    username,
                     isAdmin: true,
-                    balance: 0,
-                    invitedCount: 0,
-                    depositApproved: true
+                    balance: 0
                 }
             });
         }
@@ -183,13 +171,14 @@ router.post("/login", async (req, res) => {
         });
 
     } catch (err) {
+        console.log("Login error:", err);
         res.status(500).json({
             message: err.message
         });
     }
 });
 
-/* Forgot password */
+/* FORGOT PASSWORD */
 router.post("/forgot-password", async (req, res) => {
     try {
         const { email } = req.body;
@@ -214,13 +203,14 @@ router.post("/forgot-password", async (req, res) => {
         });
 
     } catch (err) {
+        console.log("Forgot password error:", err);
         res.status(500).json({
             message: err.message
         });
     }
 });
 
-/* Reset password */
+/* RESET PASSWORD */
 router.post("/reset-password", async (req, res) => {
     try {
         const { token, newPassword } = req.body;
@@ -245,6 +235,7 @@ router.post("/reset-password", async (req, res) => {
         });
 
     } catch (err) {
+        console.log("Reset password error:", err);
         res.status(500).json({
             message: err.message
         });
