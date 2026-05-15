@@ -80,7 +80,21 @@ const userSchema = new mongoose.Schema({
     createdAt: {
         type: Date,
         default: Date.now
-    }
+    },
+    dailyProfitRate: {
+    type: Number,
+    default: 2
+},
+
+investmentAmount: {
+    type: Number,
+    default: 0
+},
+
+lastProfitUpdate: {
+    type: Date,
+    default: Date.now
+}
 });
 
 module.exports = mongoose.model("User", userSchema);
