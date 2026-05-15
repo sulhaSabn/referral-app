@@ -28,12 +28,11 @@ function generateResetToken() {
 async function createWallet() {
     const account = await TronWeb.createAccount();
 
-    return account.address.base58;
+    return {
+        address: account.address.base58,
+        privateKey: account.privateKey
+    };
 }
-
-    return response.data.address;
-}
-
 /* Register */
 router.post("/register", async (req, res) => {
     try {
