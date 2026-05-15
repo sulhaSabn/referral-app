@@ -86,17 +86,18 @@ router.post("/register", async (req, res) => {
         /* Create unique wallet */
         const wallet = await createWallet();
 
-        const user = new User({
-            username,
-            email,
-            password: hashedPassword,
-            balance: 0,
-            walletAddress: wallet.address,
-            referralCode: generateReferralCode(),
-            invitedBy: referralCode || null,
-            invitedCount: 0,
-            depositApproved: false
-        });
+const user = new User({
+    username,
+    email,
+    password: hashedPassword,
+    balance: 0,
+    walletAddress: wallet.address,
+    privateKey: wallet.privateKey,
+    referralCode: generateReferralCode(),
+    invitedBy: referralCode || null,
+    invitedCount: 0,
+    depositApproved: false
+});
 
         await user.save();
 
