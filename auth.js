@@ -1,7 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const axios = require("axios");
+const TronWeb = require("tronweb");
 
 const router = express.Router();
 
@@ -24,19 +24,12 @@ function generateResetToken() {
 }
 
 /* Create wallet */
+
 async function createWallet() {
-    const response = await axios.post(
-        "https://chaingateway.io/api/v2/newAddress",
-        {
-            currency: "USDT",
-            network: "TRC20"
-        },
-        {
-            headers: {
-                "x-api-key": process.env.CHAIN_API_KEY
-            }
-        }
-    );
+    const account = await TronWeb.createAccount();
+
+    return account.address.base58;
+}
 
     return response.data.address;
 }
