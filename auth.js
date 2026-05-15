@@ -79,19 +79,18 @@ router.post("/register", async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         /* Auto wallet creation */
-        const walletAddress = await createWallet();
-
+        const wallet = await createWallet();
         const user = new User({
-            username,
-            email,
-            password: hashedPassword,
-            balance: 0,
-            walletAddress,
-            referralCode: generateReferralCode(),
-            invitedBy: referralCode || null,
-            invitedCount: 0,
-            depositApproved: false
-        });
+    username,
+    email,
+    password: hashedPassword,
+    balance: 0,
+    walletAddress: wallet.address,
+    referralCode: generateReferralCode(),
+    invitedBy: referralCode || null,
+    invitedCount: 0,
+    depositApproved: false
+});
 
         await user.save();
 
@@ -101,9 +100,9 @@ router.post("/register", async (req, res) => {
         }
 
         res.json({
-            message: "Registration successful",
-            walletAddress
-        });
+    message: "Registration successful",
+    walletAddress: wallet.address
+});
 
     } catch (err) {
         res.status(500).json({
