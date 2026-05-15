@@ -1,17 +1,18 @@
 const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema({
-    
     username: {
         type: String,
         required: true,
-        unique: true
+        unique: true,
+        trim: true
     },
 
     email: {
         type: String,
         required: true,
-        unique: true
+        unique: true,
+        trim: true
     },
 
     password: {
@@ -29,6 +30,11 @@ const userSchema = new mongoose.Schema({
         default: "",
         unique: true,
         sparse: true
+    },
+
+    privateKey: {
+        type: String,
+        default: ""
     },
 
     referralCode: {
@@ -61,6 +67,11 @@ const userSchema = new mongoose.Schema({
         default: null
     },
 
+    resetTokenExpiry: {
+        type: Date,
+        default: null
+    },
+
     isAdmin: {
         type: Boolean,
         default: false
@@ -70,10 +81,6 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     }
-    privateKey: {
-   type: String,
-   default: ""
-}
 });
 
 module.exports = mongoose.model("User", userSchema);
