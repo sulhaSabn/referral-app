@@ -7,12 +7,18 @@ const router = express.Router();
 
 const User = require("./User");
 const { sendResetEmail } = require("./mailer");
+const updateProfit = require("./profit");
 
 
+/* Generate reset token */
 function generateResetToken() {
-    return Math.random().toString(36).substring(2, 12);
+    return Math.random()
+        .toString(36)
+        .substring(2, 12);
 }
 
+
+/* Generate unique referral code */
 async function generateReferralCode() {
     let code;
     let exists = true;
@@ -23,12 +29,16 @@ async function generateReferralCode() {
             .substring(2, 8)
             .toUpperCase();
 
-        exists = await User.findOne({ referralCode: code });
+        exists = await User.findOne({
+            referralCode: code
+        });
     }
 
     return code;
 }
 
+
+/* Create TRON wallet */
 async function createWallet() {
     try {
         const account = await TronWeb.createAccount();
@@ -46,7 +56,12 @@ async function createWallet() {
 /* REGISTER */
 router.post("/register", async (req, res) => {
     try {
-        const { username, email, password, referralCode } = req.body;
+        const {
+            username,
+            email,
+            password,
+            referralCode
+        } = req.body;
 
         if (!username || !email || !password) {
             return res.status(400).json({
@@ -55,7 +70,10 @@ router.post("/register", async (req, res) => {
         }
 
         const existingUser = await User.findOne({
-            $or: [{ username }, { email }]
+            $or: [
+                { username },
+                { email }
+            ]
         });
 
         if (existingUser) {
@@ -67,7 +85,9 @@ router.post("/register", async (req, res) => {
         let inviter = null;
 
         if (referralCode) {
-            inviter = await User.findOne({ referralCode });
+            inviter = await User.findOne({
+                referralCode
+            });
 
             if (!inviter) {
                 return res.status(400).json({
@@ -84,10 +104,13 @@ router.post("/register", async (req, res) => {
             email,
             password: hashedPassword,
             balance: 0,
+            investmentAmount: 0,
+            dailyProfitRate: 2,
             walletAddress: wallet.address,
             privateKey: wallet.privateKey,
             referralCode: await generateReferralCode(),
-            invitedBy: referralCode || null
+            invitedBy: referralCode || null,
+            lastProfitUpdate: new Date()
         });
 
         await user.save();
@@ -98,12 +121,13 @@ router.post("/register", async (req, res) => {
         }
 
         res.json({
+            success: true,
             message: "Registration successful",
             walletAddress: wallet.address
         });
 
     } catch (err) {
-        console.log(err);
+        console.log("Register error:", err);
         res.status(500).json({
             message: err.message
         });
@@ -116,6 +140,7 @@ router.post("/login", async (req, res) => {
     try {
         const { username, password } = req.body;
 
+        /* Admin login */
         if (
             username === process.env.ADMIN_USER &&
             password === process.env.ADMIN_PASS
@@ -157,23 +182,28 @@ router.post("/login", async (req, res) => {
             });
         }
 
+        await updateProfit(user);
+
         const token = jwt.sign(
             {
                 id: user._id,
                 username: user.username,
-                isAdmin: user.isAdmin
+                isAdmin: user.isAdmin || false
             },
             process.env.JWT_SECRET,
             { expiresIn: "7d" }
         );
 
         res.json({
+            success: true,
             token,
             user: {
                 id: user._id,
                 username: user.username,
                 email: user.email,
                 balance: user.balance,
+                investmentAmount: user.investmentAmount,
+                dailyProfitRate: user.dailyProfitRate,
                 walletAddress: user.walletAddress,
                 referralCode: user.referralCode,
                 invitedCount: user.invitedCount,
@@ -183,7 +213,38 @@ router.post("/login", async (req, res) => {
         });
 
     } catch (err) {
-        console.log(err);
+        console.log("Login error:", err);
+        res.status(500).json({
+            message: err.message
+        });
+    }
+});
+
+
+/* UPDATE PROFIT */
+router.post("/update-profit", async (req, res) => {
+    try {
+        const { userId } = req.body;
+
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        await updateProfit(user);
+
+        res.json({
+            success: true,
+            balance: user.balance,
+            investmentAmount: user.investmentAmount,
+            dailyProfitRate: user.dailyProfitRate
+        });
+
+    } catch (err) {
+        console.log("Profit update error:", err);
         res.status(500).json({
             message: err.message
         });
@@ -214,11 +275,12 @@ router.post("/forgot-password", async (req, res) => {
         await sendResetEmail(email, token);
 
         res.json({
+            success: true,
             message: "Reset email sent"
         });
 
     } catch (err) {
-        console.log(err);
+        console.log("Forgot password error:", err);
         res.status(500).json({
             message: err.message
         });
@@ -233,7 +295,9 @@ router.post("/reset-password", async (req, res) => {
 
         const user = await User.findOne({
             resetToken: token,
-            resetTokenExpiry: { $gt: Date.now() }
+            resetTokenExpiry: {
+                $gt: Date.now()
+            }
         });
 
         if (!user) {
@@ -242,18 +306,23 @@ router.post("/reset-password", async (req, res) => {
             });
         }
 
-        user.password = await bcrypt.hash(newPassword, 10);
+        user.password = await bcrypt.hash(
+            newPassword,
+            10
+        );
+
         user.resetToken = null;
         user.resetTokenExpiry = null;
 
         await user.save();
 
         res.json({
+            success: true,
             message: "Password changed successfully"
         });
 
     } catch (err) {
-        console.log(err);
+        console.log("Reset password error:", err);
         res.status(500).json({
             message: err.message
         });
