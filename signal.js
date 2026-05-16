@@ -16,7 +16,7 @@ function getAvailableSignals(user) {
 
     if (
         user.depositApproved &&
-        user.investmentAmount >= 50
+        user.investmentAmount >= 1
     ) {
         // 3:40
         if (currentMinutes >= 220) {
