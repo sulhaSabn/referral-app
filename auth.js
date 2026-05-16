@@ -397,4 +397,46 @@ router.post("/claim-signal", async (req, res) => {
         });
     }
 });
+router.post("/check-signal-reward", async (req, res) => {
+    try {
+        const { userId } = req.body;
+
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        if (
+            user.pendingSignalReward > 0 &&
+            user.signalClaimTime
+        ) {
+            const diff =
+                Date.now() -
+                new Date(user.signalClaimTime);
+
+            if (diff >= 1800000) {
+                user.balance +=
+                    user.pendingSignalReward;
+
+                user.pendingSignalReward = 0;
+                user.signalClaimTime = null;
+
+                await user.save();
+            }
+        }
+
+        res.json({
+            success: true,
+            balance: user.balance
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            message: err.message
+        });
+    }
+});
 module.exports = router;
