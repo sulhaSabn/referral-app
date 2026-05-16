@@ -328,5 +328,73 @@ router.post("/reset-password", async (req, res) => {
         });
     }
 });
+router.post("/signals", async (req, res) => {
+    try {
+        const { userId } = req.body;
 
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        const signals = getAvailableSignals(user);
+
+        res.json({
+            success: true,
+            signals
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            message: err.message
+        });
+    }
+});
+router.post("/claim-signal", async (req, res) => {
+    try {
+        const { userId, signalId } = req.body;
+
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        const availableSignals =
+            getAvailableSignals(user);
+
+        if (
+            !availableSignals.includes(signalId)
+        ) {
+            return res.status(400).json({
+                message: "Signal unavailable"
+            });
+        }
+
+        const reward =
+            user.investmentAmount * 0.005;
+
+        user.pendingSignalReward = reward;
+        user.signalClaimTime = new Date();
+        user.dailySignals.push(signalId);
+
+        await user.save();
+
+        res.json({
+            success: true,
+            message:
+                "Signal claimed. Reward after 30 minutes."
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            message: err.message
+        });
+    }
+});
 module.exports = router;
