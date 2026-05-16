@@ -2,7 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { TronWeb } = require("tronweb");
-
+const getAvailableSignals = require("./signal");
 const router = express.Router();
 
 const User = require("./User");
