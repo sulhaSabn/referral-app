@@ -94,6 +94,20 @@ investmentAmount: {
 lastProfitUpdate: {
     type: Date,
     default: Date.now
+},
+    dailySignals: {
+    type: Array,
+    default: []
+},
+
+pendingSignalReward: {
+    type: Number,
+    default: 0
+},
+
+signalClaimTime: {
+    type: Date,
+    default: null
 }
 });
 
